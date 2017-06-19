@@ -1,3 +1,15 @@
+# This variable requests the highest version of 
+# Visual Studio to be installed. Previous versions
+# will also be available and work. So, choosing 2015 here makes
+# available both `msvs_toolset: 12` (from Visual Studio 2013)
+# and `msvs_toolset: 14` (from Visual Studio 2015)
+# Note/TODO: it is not yet confirmed that earlier versions work with the the `Visual Studio 2017` os image. 
+os: Visual Studio 2015
+
+platform:
+  - x86
+  - x64
+
 environment:
   node_pre_gyp_accessKeyId:
     secure: 7DrSVc5eIGtmMcki5H+iRft+Tk3MJTwDBQEUuJHWaQ4=
@@ -5,63 +17,28 @@ environment:
     secure: 1amwJJw9fu0j6dXnc5KsAQbSYf7Cjw/dapT6OZWABa6nc52grkKeLQ+DGaOfQz8i
   matrix:
     - nodejs_version: 0.10
-      platform: x86
-      msvs_toolset: 12
-    - nodejs_version: 0.10
-      platform: x64
-      msvs_toolset: 12
-    - nodejs_version: 0.12
-      platform: x86
-      msvs_toolset: 12
-    - nodejs_version: 0.12
-      platform: x64
       msvs_toolset: 12
     - nodejs_version: 4
-      platform: x64
       msvs_toolset: 12
+    - nodejs_version: 5
+      msvs_toolset: 12
+    - nodejs_version: 6
+      msvs_toolset: 12
+    - nodejs_version: 7
+      msvs_toolset: 12
+    - nodejs_version: 8
+      msvs_toolset: 12
+    # visual studio 2015 builds
     - nodejs_version: 4
-      platform: x86
-      msvs_toolset: 12
-    - nodejs_version: 5
-      platform: x64
-      msvs_toolset: 12
-    - nodejs_version: 5
-      platform: x86
-      msvs_toolset: 12
+      msvs_toolset: 14
     - nodejs_version: 6
-      platform: x64
-      msvs_toolset: 12
-    - nodejs_version: 6
-      platform: x86
-      msvs_toolset: 12
-    - nodejs_version: 7
-      platform: x64
-      msvs_toolset: 12
-    - nodejs_version: 7
-      platform: x86
-      msvs_toolset: 12
-    # custom visual studio 2015 builds
-    - nodejs_version: 0.10.40
-      platform: x86
       msvs_toolset: 14
-      TOOLSET_ARGS: --dist-url=https://s3.amazonaws.com/mapbox/node-cpp11 --toolset=v140
-    - nodejs_version: 0.10.40
-      platform: x64
+    - nodejs_version: 8
       msvs_toolset: 14
-      TOOLSET_ARGS: --dist-url=https://s3.amazonaws.com/mapbox/node-cpp11 --toolset=v140
-    - nodejs_version: 0.12.7
-      platform: x86
-      msvs_toolset: 14
-      TOOLSET_ARGS: --dist-url=https://s3.amazonaws.com/mapbox/node-cpp11 --toolset=v140
-    - nodejs_version: 0.12.7
-      platform: x64
-      msvs_toolset: 14
-      TOOLSET_ARGS: --dist-url=https://s3.amazonaws.com/mapbox/node-cpp11 --toolset=v140
-
-os: Visual Studio 2015
 
 install:
-  - scripts\build-appveyor.bat
+  - ps: Start-FileDownload 'https://github.com/mapbox/ci-scripts/raw/v1.1.0/node/ci-cpp.bat' -FileName ci.bat
+  - CALL ci.bat
 
 build: OFF
 test: OFF
