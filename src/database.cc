@@ -344,6 +344,11 @@ NAN_METHOD(Database::Configure) {
         baton->status = Nan::To<int>(info[1]).FromJust();
         db->Schedule(SetBusyTimeout, baton);
     }
+    else if (Nan::Equals(info[0], Nan::New("change").ToLocalChecked()).FromJust()) {
+        Local<Function> handle;
+        Baton* baton = new Baton(db, handle);
+        db->Schedule(RegisterUpdateCallback, baton);
+    }
     else {
         return Nan::ThrowError(Exception::Error(String::Concat(
 #if V8_MAJOR_VERSION > 6
@@ -499,12 +504,13 @@ void Database::UpdateCallback(Database *db, UpdateInfo* info) {
     Nan::HandleScope scope;
 
     Local<Value> argv[] = {
+        Nan::New("change").ToLocalChecked(),
         Nan::New(sqlite_authorizer_string(info->type)).ToLocalChecked(),
         Nan::New(info->database.c_str()).ToLocalChecked(),
         Nan::New(info->table.c_str()).ToLocalChecked(),
         Nan::New<Number>(info->rowid),
     };
-    EMIT_EVENT(db->handle(), 4, argv);
+    EMIT_EVENT(db->handle(), 5, argv);
     delete info;
 }
 
