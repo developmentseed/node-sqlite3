@@ -335,6 +335,13 @@ NAN_METHOD(Database::Configure) {
         Baton* baton = new Baton(db, handle);
         db->Schedule(RegisterProfileCallback, baton);
     }
+    else if (
+        Nan::Equals(info[0], Nan::New("change").ToLocalChecked()).FromJust()
+    ) {
+        Local<Function> handle;
+        Baton* baton = new Baton(db, handle);
+        db->Schedule(RegisterUpdateCallback, baton);
+    }
     else if (Nan::Equals(info[0], Nan::New("busyTimeout").ToLocalChecked()).FromJust()) {
         if (!info[1]->IsInt32()) {
             return Nan::ThrowTypeError("Value must be an integer");
@@ -499,12 +506,13 @@ void Database::UpdateCallback(Database *db, UpdateInfo* info) {
     Nan::HandleScope scope;
 
     Local<Value> argv[] = {
+        Nan::New("change").ToLocalChecked(),
         Nan::New(sqlite_authorizer_string(info->type)).ToLocalChecked(),
         Nan::New(info->database.c_str()).ToLocalChecked(),
         Nan::New(info->table.c_str()).ToLocalChecked(),
         Nan::New<Number>(info->rowid),
     };
-    EMIT_EVENT(db->handle(), 4, argv);
+    EMIT_EVENT(db->handle(), 5, argv);
     delete info;
 }
 
