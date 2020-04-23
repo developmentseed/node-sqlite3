@@ -77,6 +77,9 @@ public:
 
     static NAN_MODULE_INIT(Init);
     static NAN_METHOD(New);
+    static NAN_METHOD(RunSync);
+    static NAN_METHOD(GetSync);
+    static NAN_METHOD(AllSync);
 
     struct Baton {
         uv_work_t request;
@@ -207,6 +210,7 @@ public:
     WORK_DEFINITION(Reset);
 
     static NAN_METHOD(Finalize);
+    static NAN_METHOD(FinalizeSync);
 
 protected:
     static void Work_BeginPrepare(Database::Baton* baton);
@@ -215,6 +219,10 @@ protected:
 
     static void AsyncEach(uv_async_t* handle, int status);
     static void CloseCallback(uv_handle_t* handle);
+    static void DoRun(Statement* stmt, RunBaton* baton);
+    static void DoGet(Statement* stmt, RowBaton* baton);
+    static void DoAll(Statement* stmt, RowsBaton* baton);
+    static void AssignBatonValuesToHandler(Statement* stmt, RunBaton* baton);
 
     static void Finalize(Baton* baton);
     void Finalize();

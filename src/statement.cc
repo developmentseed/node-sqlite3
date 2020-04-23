@@ -21,11 +21,15 @@ NAN_MODULE_INIT(Statement::Init) {
 
     Nan::SetPrototypeMethod(t, "bind", Bind);
     Nan::SetPrototypeMethod(t, "get", Get);
+    Nan::SetPrototypeMethod(t, "getSync", GetSync);
     Nan::SetPrototypeMethod(t, "run", Run);
+    Nan::SetPrototypeMethod(t, "runSync", RunSync);
     Nan::SetPrototypeMethod(t, "all", All);
+    Nan::SetPrototypeMethod(t, "allSync", AllSync);
     Nan::SetPrototypeMethod(t, "each", Each);
     Nan::SetPrototypeMethod(t, "reset", Reset);
     Nan::SetPrototypeMethod(t, "finalize", Finalize);
+    Nan::SetPrototypeMethod(t, "finalizeSync", FinalizeSync);
 
     constructor_template.Reset(t);
     Nan::Set(target, Nan::New("Statement").ToLocalChecked(),
@@ -366,13 +370,34 @@ NAN_METHOD(Statement::Get) {
     }
 }
 
+NAN_METHOD(Statement::GetSync) {
+    Statement* stmt = Nan::ObjectWrap::Unwrap<Statement>(info.This());
+
+    RowBaton* baton = stmt->Bind<RowBaton>(info);
+    if (baton == NULL) {
+        return Nan::ThrowError("Data type is not supported");
+    }
+
+    stmt->DoGet(baton->stmt, baton);
+    if (stmt->status != SQLITE_ROW && stmt->status != SQLITE_DONE) {
+        Error(baton);
+    } else {
+        stmt->status = SQLITE_OK;
+    }
+
+    info.GetReturnValue().Set(RowToJS(&baton->row));
+}
+
 void Statement::Work_BeginGet(Baton* baton) {
     STATEMENT_BEGIN(Get);
 }
 
 void Statement::Work_Get(uv_work_t* req) {
     STATEMENT_INIT(RowBaton);
+    stmt->DoGet(stmt, baton);
+}
 
+void Statement::DoGet(Statement* stmt, RowBaton* baton) {
     if (stmt->status != SQLITE_DONE || baton->parameters.size()) {
         sqlite3_mutex* mtx = sqlite3_db_mutex(stmt->db->_handle);
         sqlite3_mutex_enter(mtx);
@@ -434,13 +459,29 @@ NAN_METHOD(Statement::Run) {
     }
 }
 
-void Statement::Work_BeginRun(Baton* baton) {
-    STATEMENT_BEGIN(Run);
+NAN_METHOD(Statement::RunSync) {
+    Statement* stmt = Nan::ObjectWrap::Unwrap<Statement>(info.This());
+
+    RunBaton* baton = stmt->Bind<RunBaton>(info);
+    if (baton == NULL) {
+        return Nan::ThrowError("Data type is not supported");
+    }
+
+    stmt->DoRun(baton->stmt, baton);
+
+    if (stmt->status != SQLITE_ROW && stmt->status != SQLITE_DONE) {
+        Error(baton);
+    } else {
+        stmt->AssignBatonValuesToHandler(stmt, baton);
+        stmt->status = SQLITE_OK;
+    }
+
+    delete baton;
+
+    info.GetReturnValue().Set(info.This());
 }
 
-void Statement::Work_Run(uv_work_t* req) {
-    STATEMENT_INIT(RunBaton);
-
+void Statement::DoRun(Statement* stmt, RunBaton* baton) {
     sqlite3_mutex* mtx = sqlite3_db_mutex(stmt->db->_handle);
     sqlite3_mutex_enter(mtx);
 
@@ -464,6 +505,20 @@ void Statement::Work_Run(uv_work_t* req) {
     sqlite3_mutex_leave(mtx);
 }
 
+void Statement::AssignBatonValuesToHandler(Statement* stmt, RunBaton* baton) {
+    Nan::Set(stmt->handle(), Nan::New("lastID").ToLocalChecked(), Nan::New<Number>(baton->inserted_id));
+    Nan::Set(stmt->handle(), Nan::New("changes").ToLocalChecked(), Nan::New(baton->changes));
+}
+
+void Statement::Work_BeginRun(Baton* baton) {
+    STATEMENT_BEGIN(Run);
+}
+
+void Statement::Work_Run(uv_work_t* req) {
+    STATEMENT_INIT(RunBaton);
+    stmt->DoRun(stmt, baton);
+}
+
 void Statement::Work_AfterRun(uv_work_t* req) {
     Nan::HandleScope scope;
 
@@ -476,8 +531,7 @@ void Statement::Work_AfterRun(uv_work_t* req) {
         // Fire callbacks.
         Local<Function> cb = Nan::New(baton->callback);
         if (!cb.IsEmpty() && cb->IsFunction()) {
-            Nan::Set(stmt->handle(), Nan::New("lastID").ToLocalChecked(), Nan::New<Number>(baton->inserted_id));
-            Nan::Set(stmt->handle(), Nan::New("changes").ToLocalChecked(), Nan::New(baton->changes));
+            stmt->AssignBatonValuesToHandler(stmt, baton);
 
             Local<Value> argv[] = { Nan::Null() };
             TRY_CATCH_CALL(stmt->handle(), cb, 1, argv);
@@ -500,13 +554,42 @@ NAN_METHOD(Statement::All) {
     }
 }
 
+NAN_METHOD(Statement::AllSync) {
+    Statement* stmt = Nan::ObjectWrap::Unwrap<Statement>(info.This());
+
+    RowsBaton* baton = stmt->Bind<RowsBaton>(info);
+    if (baton == NULL) {
+        return Nan::ThrowError("Data type is not supported");
+    }
+
+    stmt->DoAll(baton->stmt, baton);
+    if (stmt->status != SQLITE_ROW && stmt->status != SQLITE_DONE) {
+        Error(baton);
+    } else {
+        stmt->status = SQLITE_OK;
+    }
+
+    // Create the result array from the data we acquired.
+    Local<Array> result(Nan::New<Array>(baton->rows.size()));
+    Rows::const_iterator it = baton->rows.begin();
+    Rows::const_iterator end = baton->rows.end();
+    for (int i = 0; it < end; ++it, i++) {
+        Nan::Set(result, i, RowToJS(*it));
+        delete *it;
+    }
+    info.GetReturnValue().Set(result);
+}
+
 void Statement::Work_BeginAll(Baton* baton) {
     STATEMENT_BEGIN(All);
 }
 
 void Statement::Work_All(uv_work_t* req) {
     STATEMENT_INIT(RowsBaton);
+    stmt->DoAll(stmt, baton);
+}
 
+void Statement::DoAll(Statement* stmt, RowsBaton* baton) {
     sqlite3_mutex* mtx = sqlite3_db_mutex(stmt->db->_handle);
     sqlite3_mutex_enter(mtx);
 
@@ -822,6 +905,13 @@ NAN_METHOD(Statement::Finalize) {
 
     Baton* baton = new Baton(stmt, callback);
     stmt->Schedule(Finalize, baton);
+
+    info.GetReturnValue().Set(stmt->db->handle());
+}
+
+NAN_METHOD(Statement::FinalizeSync) {
+    Statement* stmt = Nan::ObjectWrap::Unwrap<Statement>(info.This());
+    stmt->Finalize();
 
     info.GetReturnValue().Set(stmt->db->handle());
 }
