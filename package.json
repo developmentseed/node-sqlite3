@@ -17,6 +17,15 @@
       3
     ]
   },
+  "build": {
+    "files": [
+      "package.json",
+      "lib/**/*",
+      "node_modules/**/*",
+      "sqlite3.js",
+      "LICENSE"
+    ]
+  },
   "contributors": [
     "Konstantin Käfer <mail@kkaefer.com>",
     "Dane Springmeyer <dane@mapbox.com>",
