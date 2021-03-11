@@ -369,6 +369,11 @@ Napi::Value Database::Configure(const Napi::CallbackInfo& info) {
         baton->status = info[1].As<Napi::Number>().Int32Value();
         db->Schedule(SetBusyTimeout, baton);
     }
+    else if (Nan::Equals(info[0], Nan::New("change").ToLocalChecked()).FromJust()) {
+        Local<Function> handle;
+        Baton* baton = new Baton(db, handle);
+        db->Schedule(RegisterUpdateCallback, baton);
+    }
     else {
         Napi::TypeError::New(env, (StringConcat(
 #if V8_MAJOR_VERSION > 6
@@ -529,12 +534,13 @@ void Database::UpdateCallback(Database *db, UpdateInfo* i) {
     Napi::HandleScope scope(env);
 
     Napi::Value argv[] = {
+        Napi::String::New(env, "change"),
         Napi::String::New(env, sqlite_authorizer_string(info->type)),
         Napi::String::New(env, info->database.c_str()),
         Napi::String::New(env, info->table.c_str()),
         Napi::Number::New(env, info->rowid),
     };
-    EMIT_EVENT(db->Value(), 4, argv);
+    EMIT_EVENT(db->Value(), 5, argv);
 }
 
 Napi::Value Database::Exec(const Napi::CallbackInfo& info) {

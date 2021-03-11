@@ -9,8 +9,15 @@ var db;
 function createDb() {
     console.log("createDb chain");
     db = new sqlite3.Database('chain.sqlite3', createTable);
+
+    listenDatabaseUpdates();
 }
 
+function listenDatabaseUpdates() {
+    db.addListener('change', function(eventType, database, table, rowId) {
+        console.log("database was changed", eventType, database, table, rowId);
+    });
+}
 
 function createTable() {
     console.log("createTable lorem");
